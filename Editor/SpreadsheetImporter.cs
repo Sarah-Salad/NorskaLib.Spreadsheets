@@ -20,13 +20,6 @@ namespace NorskaLib.Spreadsheets
         Array,
     }
 
-    private static object CreateInstance(Type type)
-    {
-        if (typeof(UnityEngine.ScriptableObject).IsAssignableFrom(type))
-            return UnityEngine.ScriptableObject.CreateInstance(type);
-        else
-            return Activator.CreateInstance(type);
-    }
 
     public class SpreadsheetImporter
     {
@@ -51,6 +44,15 @@ namespace NorskaLib.Spreadsheets
                 onOutputChanged.Invoke();
             }
         }
+
+        private static object CreateInstance(Type type)
+        {
+            if (typeof(UnityEngine.ScriptableObject).IsAssignableFrom(type))
+                return UnityEngine.ScriptableObject.CreateInstance(type);
+            else
+                return Activator.CreateInstance(type);
+        }
+
         public event Action onOutputChanged;
 
         public float progress;
