@@ -250,7 +250,7 @@ namespace NorskaLib.Spreadsheets
 
                 case SupportedContentFieldTypes.Array:
                     {
-                        var array = (Array)CreateInstance(contentType.MakeArrayType(), rows.Count);
+                        var array = (Array)Activator.CreateInstance(contentType.MakeArrayType(), rows.Count);
                         for (int i = 0; i < array.Length; i++)
                         {
                             var row = rows[i];
