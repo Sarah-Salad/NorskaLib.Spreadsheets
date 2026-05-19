@@ -20,6 +20,14 @@ namespace NorskaLib.Spreadsheets
         Array,
     }
 
+    private static object CreateInstance(Type type)
+    {
+        if (typeof(UnityEngine.ScriptableObject).IsAssignableFrom(type))
+            return UnityEngine.ScriptableObject.CreateInstance(type);
+        else
+            return Activator.CreateInstance(type);
+    }
+
     public class SpreadsheetImporter
     {
         public const string URLFormat = @"https://docs.google.com/spreadsheets/d/{0}/gviz/tq?tqx=out:csv&sheet={1}";
@@ -213,7 +221,7 @@ namespace NorskaLib.Spreadsheets
                 case SupportedContentFieldTypes.Object:
                     {
                         var row = rows[0];
-                        var obj = Activator.CreateInstance(contentType);
+                        var obj = CreateInstance(contentType);
                         for (int i = 0; i < headers.Count; i++)
                             if (headersToFields.TryGetValue(headers[i], out var field))
                                 field.SetValue(obj, Parse(row[i], field.FieldType));
@@ -223,10 +231,10 @@ namespace NorskaLib.Spreadsheets
 
                 case SupportedContentFieldTypes.List:
                     {
-                        var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(contentType));
+                        var list = (IList)CreateInstance(typeof(List<>).MakeGenericType(contentType));
                         foreach (var row in rows)
                         {
-                            var contentItem = Activator.CreateInstance(contentType);
+                            var contentItem = CreateInstance(contentType);
 
                             for (int h = 0; h < headers.Count; h++)
                                 if (headersToFields.TryGetValue(headers[h], out var field))
@@ -240,11 +248,11 @@ namespace NorskaLib.Spreadsheets
 
                 case SupportedContentFieldTypes.Array:
                     {
-                        var array = (Array)Activator.CreateInstance(contentType.MakeArrayType(), rows.Count);
+                        var array = (Array)CreateInstance(contentType.MakeArrayType(), rows.Count);
                         for (int i = 0; i < array.Length; i++)
                         {
                             var row = rows[i];
-                            var contentItem = Activator.CreateInstance(contentType);
+                            var contentItem = CreateInstance(contentType);
                             for (int h = 0; h < headers.Count; h++)
                                 if (headersToFields.TryGetValue(headers[h], out var field))
                                     field.SetValue(contentItem, Parse(row[h], field.FieldType));
