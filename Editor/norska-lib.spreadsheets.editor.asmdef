@@ -1,23 +1,14 @@
 {
     "name": "NorskaLib.Spreadsheets.Editor",
-    "rootNamespace": "NorskaLib",
     "references": [
-        "NorskaLib.Spreadsheets"
+        "Unity.Localization.Editor"
     ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "includePlatforms": ["Editor"],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,
-    "precompiledReferences": [
-        "Google.Apis.dll",
-        "Google.Apis.Core.dll",
-        "Google.Apis.Auth.dll",
-        "Google.Apis.Sheets.v4.dll",
-        "Newtonsoft.Json.dll"
-    ],
-    "autoReferenced": true,
+    "precompiledReferences": [],
+    "autoReferenced": false,
     "defineConstraints": [],
     "versionDefines": [],
     "noEngineReferences": false
