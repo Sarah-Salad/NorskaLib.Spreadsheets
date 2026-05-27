@@ -1,14 +1,18 @@
 {
     "name": "NorskaLib.Spreadsheets.Editor",
+    "rootNamespace": "NorskaLib",
     "references": [
+        "NorskaLib.Spreadsheets",
         "Unity.Localization.Editor"
     ],
-    "includePlatforms": ["Editor"],
+    "includePlatforms": [
+        "Editor"
+    ],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,
     "precompiledReferences": [],
-    "autoReferenced": false,
+    "autoReferenced": true,
     "defineConstraints": [],
     "versionDefines": [],
     "noEngineReferences": false
