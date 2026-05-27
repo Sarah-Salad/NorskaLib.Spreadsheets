@@ -206,8 +206,12 @@ namespace NorskaLib.Spreadsheets
 
             EditorUtility.DisplayProgressBar("Downloading definitions", "Initializing...", 0);
 
-            importer = new SpreadsheetImporter(content, selectedContentFields.ToArray(), container.documentId);
-
+            var importer = new SpreadsheetImporter(
+                target,
+                fields,
+                container.documentId,
+                GoogleOAuthFetcher.FetchAsync
+            );
             importer.onComplete += OnImportQueueComplete;
             importer.onOutputChanged += OnOutputChanged;
             importer.onProgressChanged += OnProgressChanged;

@@ -20,7 +20,6 @@ namespace NorskaLib.Spreadsheets
         Array,
     }
 
-
     public class SpreadsheetImporter
     {
         public const string URLFormat = @"https://docs.google.com/spreadsheets/d/{0}/gviz/tq?tqx=out:csv&sheet={1}";
@@ -73,28 +72,37 @@ namespace NorskaLib.Spreadsheets
 
         private float ProgressElementDelta
             => 1f / targetListsFields.Length;
+        
+        public delegate Task<string> SheetFetcher(string url);
 
-        public SpreadsheetImporter(object targetObject, FieldInfo[] targetListsFields, string documentID)
+        public SpreadsheetImporter(object targetObject, FieldInfo[] targetListsFields, string documentID, SheetFetcher fetcher = null)
         {
             this.targetObject = targetObject;
             this.targetListsFields = targetListsFields;
             this.documentID = documentID;
+            this.fetcher = fetcher ?? DefaultFetch;
         }
+
+        private readonly SheetFetcher fetcher;
+
+        private static async Task<string> DefaultFetch(string url)
+        {
+            using var client = new WebClient();
+            return await client.DownloadStringTaskAsync(url);
+        }
+
 
         public async void Run()
         {
             operationFailed = false;
-            var webClient = new WebClient();
 
             for (int i = 0; i < targetListsFields.Length && !operationFailed; i++)
-                await PopulateList(targetObject, targetListsFields[i], webClient);
-
-            webClient.Dispose();
+                await PopulateList(targetObject, targetListsFields[i]);
 
             onComplete?.Invoke();
         }
 
-        private async Task PopulateList(object contentObject, FieldInfo targetContentField, WebClient webClient)
+        private async Task PopulateList(object contentObject, FieldInfo targetContentField)
         {
             var contentType = default(Type);
             var contentTypeFlag = default(SupportedContentFieldTypes);
@@ -121,46 +129,29 @@ namespace NorskaLib.Spreadsheets
                 contentType = targetContentField.FieldType;
                 contentTypeFlag = SupportedContentFieldTypes.Object;
             }
-
-            #region Downloading page
-
             var pageAttribute = (SpreadsheetPageAttribute)Attribute.GetCustomAttribute(targetContentField, typeof(SpreadsheetPageAttribute));
             var pageName = pageAttribute.name;
 
             Output = $"Downloading page '{pageName}'...";
 
             var url = string.Format(URLFormat, documentID, pageName);
-            var request = default(Task<string>);
 
+            string rawCsv;
             try
             {
-                request = webClient.DownloadStringTaskAsync(url);
+                rawCsv = await fetcher(url);
             }
-            catch (WebException)
+            catch (Exception ex)
             {
-                var message = $"Bad URL '{url}'";
+                var message = $"Failed to fetch '{url}': {ex.Message}";
                 operationFailed = true;
                 onOperationFailed?.Invoke(message);
                 throw new Exception(message);
             }
-
-            while (!request.IsCompleted)
-                await Task.Delay(100);
-
-            if (request.IsFaulted)
-            {
-                var message = $"Bad URL '{url}'";
-                operationFailed = true;
-                onOperationFailed?.Invoke(message);
-                throw new Exception(message);
-            }
-
-            var rawTable = Regex.Split(request.Result, "\r\n|\r|\n");
-            request.Dispose();
-
+            
             Progress += 1 / 3f * ProgressElementDelta;
 
-            #endregion
+            var rawTable = Regex.Split(rawCsv, "\r\n|\r|\n");
 
             #region Analyzing and splitting raw text
 
