@@ -2,8 +2,7 @@
     "name": "NorskaLib.Spreadsheets.Editor",
     "rootNamespace": "NorskaLib",
     "references": [
-        "NorskaLib.Spreadsheets",
-        "Unity.Localization.Editor"
+        "NorskaLib.Spreadsheets"
     ],
     "includePlatforms": [
         "Editor"

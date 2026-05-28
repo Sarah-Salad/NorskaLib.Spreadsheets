@@ -43,15 +43,6 @@ namespace NorskaLib.Spreadsheets
                 onOutputChanged.Invoke();
             }
         }
-
-        private static object CreateInstance(Type type)
-        {
-            if (typeof(UnityEngine.ScriptableObject).IsAssignableFrom(type))
-                return UnityEngine.ScriptableObject.CreateInstance(type);
-            else
-                return Activator.CreateInstance(type);
-        }
-
         public event Action onOutputChanged;
 
         public float progress;
@@ -72,37 +63,28 @@ namespace NorskaLib.Spreadsheets
 
         private float ProgressElementDelta
             => 1f / targetListsFields.Length;
-        
-        public delegate Task<string> SheetFetcher(string url);
 
-        public SpreadsheetImporter(object targetObject, FieldInfo[] targetListsFields, string documentID, SheetFetcher fetcher = null)
+        public SpreadsheetImporter(object targetObject, FieldInfo[] targetListsFields, string documentID)
         {
             this.targetObject = targetObject;
             this.targetListsFields = targetListsFields;
             this.documentID = documentID;
-            this.fetcher = fetcher ?? DefaultFetch;
         }
-
-        private readonly SheetFetcher fetcher;
-
-        private static async Task<string> DefaultFetch(string url)
-        {
-            using var client = new WebClient();
-            return await client.DownloadStringTaskAsync(url);
-        }
-
 
         public async void Run()
         {
             operationFailed = false;
+            var webClient = new WebClient();
 
             for (int i = 0; i < targetListsFields.Length && !operationFailed; i++)
-                await PopulateList(targetObject, targetListsFields[i]);
+                await PopulateList(targetObject, targetListsFields[i], webClient);
+
+            webClient.Dispose();
 
             onComplete?.Invoke();
         }
 
-        private async Task PopulateList(object contentObject, FieldInfo targetContentField)
+        private async Task PopulateList(object contentObject, FieldInfo targetContentField, WebClient webClient)
         {
             var contentType = default(Type);
             var contentTypeFlag = default(SupportedContentFieldTypes);
@@ -129,29 +111,46 @@ namespace NorskaLib.Spreadsheets
                 contentType = targetContentField.FieldType;
                 contentTypeFlag = SupportedContentFieldTypes.Object;
             }
+
+            #region Downloading page
+
             var pageAttribute = (SpreadsheetPageAttribute)Attribute.GetCustomAttribute(targetContentField, typeof(SpreadsheetPageAttribute));
             var pageName = pageAttribute.name;
 
             Output = $"Downloading page '{pageName}'...";
 
             var url = string.Format(URLFormat, documentID, pageName);
+            var request = default(Task<string>);
 
-            string rawCsv;
             try
             {
-                rawCsv = await fetcher(url);
+                request = webClient.DownloadStringTaskAsync(url);
             }
-            catch (Exception ex)
+            catch (WebException)
             {
-                var message = $"Failed to fetch '{url}': {ex.Message}";
+                var message = $"Bad URL '{url}'";
                 operationFailed = true;
                 onOperationFailed?.Invoke(message);
                 throw new Exception(message);
             }
-            
+
+            while (!request.IsCompleted)
+                await Task.Delay(100);
+
+            if (request.IsFaulted)
+            {
+                var message = $"Bad URL '{url}'";
+                operationFailed = true;
+                onOperationFailed?.Invoke(message);
+                throw new Exception(message);
+            }
+
+            var rawTable = Regex.Split(request.Result, "\r\n|\r|\n");
+            request.Dispose();
+
             Progress += 1 / 3f * ProgressElementDelta;
 
-            var rawTable = Regex.Split(rawCsv, "\r\n|\r|\n");
+            #endregion
 
             #region Analyzing and splitting raw text
 
@@ -214,7 +213,7 @@ namespace NorskaLib.Spreadsheets
                 case SupportedContentFieldTypes.Object:
                     {
                         var row = rows[0];
-                        var obj = CreateInstance(contentType);
+                        var obj = Activator.CreateInstance(contentType);
                         for (int i = 0; i < headers.Count; i++)
                             if (headersToFields.TryGetValue(headers[i], out var field))
                                 field.SetValue(obj, Parse(row[i], field.FieldType));
@@ -224,10 +223,10 @@ namespace NorskaLib.Spreadsheets
 
                 case SupportedContentFieldTypes.List:
                     {
-                        var list = (IList)CreateInstance(typeof(List<>).MakeGenericType(contentType));
+                        var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(contentType));
                         foreach (var row in rows)
                         {
-                            var contentItem = CreateInstance(contentType);
+                            var contentItem = Activator.CreateInstance(contentType);
 
                             for (int h = 0; h < headers.Count; h++)
                                 if (headersToFields.TryGetValue(headers[h], out var field))
@@ -245,7 +244,7 @@ namespace NorskaLib.Spreadsheets
                         for (int i = 0; i < array.Length; i++)
                         {
                             var row = rows[i];
-                            var contentItem = CreateInstance(contentType);
+                            var contentItem = Activator.CreateInstance(contentType);
                             for (int h = 0; h < headers.Count; h++)
                                 if (headersToFields.TryGetValue(headers[h], out var field))
                                     field.SetValue(contentItem, Parse(row[h], field.FieldType));
@@ -341,6 +340,31 @@ namespace NorskaLib.Spreadsheets
                 }
                 return result;
             }
+            else if (type.IsGenericType && type.GetGenericTypeDefinition() == typeof(List<>))
+            {
+                var elementType = type.GetGenericArguments()[0];
+                
+                if (string.IsNullOrWhiteSpace(s))
+                    return Activator.CreateInstance(type); 
+                
+                var entries = s.Split(',')
+                    .Select(entry => entry.Trim())
+                    .Where(entry => !string.IsNullOrEmpty(entry));
+
+                var list = (IList)Activator.CreateInstance(type);
+                
+                foreach (var entry in entries)
+                {
+                    var parsed = Parse(entry, elementType);
+                    if (parsed != null)
+                        list.Add(parsed);
+                    else
+                        Debug.LogWarning($"[SpreadsheetImporter] Could not parse '{entry}' as {elementType.Name}");
+                }
+                
+                return list;
+            }
+
 
             return result;
         }

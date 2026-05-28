@@ -203,14 +203,11 @@ namespace NorskaLib.Spreadsheets
             if (string.IsNullOrWhiteSpace(container.documentId))
                 throw new Exception($"Document ID is not specified!");
 
+
             EditorUtility.DisplayProgressBar("Downloading definitions", "Initializing...", 0);
 
-            importer = new SpreadsheetImporter(
-                content,
-                selectedContentFields.ToArray(),
-                container.documentId,
-                GoogleOAuthFetcher.FetchAsync
-            );
+            importer = new SpreadsheetImporter(content, selectedContentFields.ToArray(), container.documentId);
+
             importer.onComplete += OnImportQueueComplete;
             importer.onOutputChanged += OnOutputChanged;
             importer.onProgressChanged += OnProgressChanged;
