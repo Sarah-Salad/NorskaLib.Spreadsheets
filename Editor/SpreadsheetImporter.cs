@@ -196,8 +196,6 @@ namespace NorskaLib.Spreadsheets
             var headersToFields = new Dictionary<string, FieldInfo>();
             foreach (var header in headers)
             {
-                // TO DO:
-                // Add support of fields with names other than the header names via an attribute
                 var bindingFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
                 var fieldInfo = contentType.GetField(header, bindingFlags);
                 if (fieldInfo is null)
@@ -205,6 +203,10 @@ namespace NorskaLib.Spreadsheets
                     Debug.LogWarning($"Header '{header}' match no field in {contentType.Name} type");
                     continue;
                 }
+                // Skip fields marked NonSerialized
+                if (fieldInfo.IsDefined(typeof(NonSerializedAttribute), false))
+                    continue;
+                
                 headersToFields.Add(header, fieldInfo);
             }
 
@@ -246,10 +248,13 @@ namespace NorskaLib.Spreadsheets
                             var row = rows[i];
                             var contentItem = Activator.CreateInstance(contentType);
                             for (int h = 0; h < headers.Count; h++)
+                            {
+                                if (h >= row.Length) break; 
                                 if (headersToFields.TryGetValue(headers[h], out var field))
                                     field.SetValue(contentItem, Parse(row[h], field.FieldType));
+                            }
                             array.SetValue(contentItem, i);
-                        }
+                        }               
                         targetContentField.SetValue(contentObject, array);
                         break; 
                     }
